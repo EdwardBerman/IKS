@@ -1,4 +1,4 @@
-title: "Differentiable Convergence Mapping in Julia"
+title: "Convergence Mapping in Julia via Iterative Kaiser-Squires Inversion with IKS.jl"
 keywords:
   - Julia
   - Astronomy
