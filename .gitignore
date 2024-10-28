@@ -1,4 +1,5 @@
 .DS_Store
+data/
 /Manifest.toml
 paper/paper.pdf
 *.aux
