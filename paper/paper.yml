@@ -1,21 +1,13 @@
-title: "My JuliaCon proceeding"
+title: "Differentiable Convergence Mapping in Julia"
 keywords:
   - Julia
-  - Optimization
-  - Game theory
-  - Compiler
+  - Astronomy
 authors:
-  - name: 1st author
-    orcid: 0000-0003-1361-440X
+  - name: Edward Berman
+    orcid: 0000-0002-8494-3123
     affiliation: 1
-  - name: 2nd author
-    affiliation: 1, 2
-  - name: 3rd author
-    affiliation: 2
 affiliations:
-  - name: University
+  - name: Northeastern University
     index: 1
-  - name: National Lab
-    index: 2
 date: 24 April 2019
 bibliography: ref.bib
