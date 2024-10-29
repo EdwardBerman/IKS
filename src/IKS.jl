@@ -19,8 +19,12 @@ function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Abs
     @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
     k1 = fftfreq(size(γ1, 1))
     k2 = fftfreq(size(γ1, 2))
+    temp = zeros(size(k2, 1), size(k1, 1))
     k1 = zeros(size(k2, 1), size(k1, 1)) .+ k1'
-    k2 = zeros(size(k2, 1), size(k1, 1)) .+ k2
+    for col in eachcol(temp)
+        col .= col .+ k2  
+    end
+    k2 = temp 
     k_squared = k1.^2 + k2.^2
     ϵ = 1e-10
     denominator = k_squared .+ ϵ
