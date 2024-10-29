@@ -2,13 +2,42 @@ module IterativeKaisserSquires
 
 using LinearAlgebra
 using WCS
+using FFTW
 
 #=
 α , δ are astrometric coordinates right ascension and declination
 x, y are pixel coordinates from source extractor tangent plane projection (with potential corrections)
 g1, g2 are shear
+k1, k2 are wave numbers
+κ_E and κ_B are the convergence fields
 M is the Mask
 =#
+
+#=
+def get_lmax_dct_inpaint(self, gamma1, gamma2):
+    """return the maximum of the DCT absolute value of the convergence map"""
+    eb = self.gamma_to_cf_kappa(gamma1, gamma2)
+    lmax = np.max(np.abs(dct2d(eb.real, norm="ortho")), axis=(-2, -1))
+    return lmax
+=#
+
+function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+    @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
+    k1 = fftfreq(size(γ1, 1))
+    k2 = fftfreq(size(γ1, 2))
+    k1 = zeros(size(γ1, 1), size(γ1, 2)) .+ k1
+    k2 = zeros(size(γ1, 1), size(γ1, 2)) .+ k2
+    k_squared = k1.^2 + k2.^2
+    ϵ = 1e-10
+    denominator = k_squared .+ ϵ
+    numerator = (k1 .- k2*im) .^2
+    κ = ifft((numerator ./ denominator) .* fft(γ1 .+ γ2*im))
+    return κ
+end
+
+function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float64
+    κ = γ_to_κ(γ1, γ2)
+end
 
 function add_zero_padding(image::AbstractMatrix{<:Real}, padding::Int64=2)::AbstractMatrix{<:Real}
     @assert padding >= 0 "padding must be a non-negative integer"
