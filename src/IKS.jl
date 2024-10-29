@@ -5,12 +5,13 @@ using WCS
 using FFTW
 
 #=
-α , δ are astrometric coordinates right ascension and declination
+αJ2000 , δJ2000 are astrometric coordinates right ascension and declination
 x, y are pixel coordinates from source extractor tangent plane projection (with potential corrections)
 g1, g2 are shear
 k1, k2 are wave numbers
 κ_E and κ_B are the convergence fields
 M is the Mask
+note also that α = ϕk in later contexts
 =#
 
 function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
@@ -30,8 +31,8 @@ end
 function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float64
     κ = γ_to_κ(γ1, γ2)
     κ_E = real(κ)
-    ϕκ = dct(κ_E) # TO-DO: Check the normalization on this
-    λ_max = maximum(ϕκ)
+    α = dct(κ_E) # TO-DO: Check the normalization on this. Note α = ϕ^T k
+    λ_max = maximum(α)
     return λ_max
 end
 
@@ -99,8 +100,8 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
         x::AbstractVector{<:Real},
         y::AbstractVector{<:Real},
         resolution::Float64,
-        sharpness::Float64,
-        max_iters::Int64=100)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
+        max_iters_inner::Int64=3,
+        max_iters_outer::Int64=100)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
 
     @assert size(g1) == size(g2) "g1 and g2 must have the same size"
     @assert size(x) == size(y) "x and y must have the same size"
@@ -109,10 +110,24 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
     γ1, γ2, M = average_shear_binning(g1, g2, x, y, resolution)
     γ1, γ2, M = add_zero_padding(γ1), add_zero_padding(γ2), add_zero_padding(M)
 
-    γ = γ1 + γ2*im
+    λmin = 0.0
+    λmax = λ_max(γ1, γ2)
 
-    λ_min = 0.0
-    k = 0
+    κ_E = zeros(size(γ1))
+    γ_init = γ1 + γ2*im
+
+    for k in 1:max_iters_outer
+        γ_k = γ_init .* (1 .- κ_E)
+        κ_k = γ_to_κ(real(γ_k), imag(γ_k))
+        κ_i = κ_k
+        λ_i = λ_max
+        for i in 1:max_iters_inner
+            α = dct(κ_i)  # α = ϕ^T k^i
+            α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
+            κ_i = idct(α_tilde)
+        end
+    end
+
 end
 
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
@@ -120,8 +135,8 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
         worldcoords::AbstractMatrix{<:Real},
         wcs::WCSTransform, 
         resolution::Float64,
-        sharpness::Float64,
-        max_iters::Int64=1000)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
+        max_iters_inner::Int64=3,
+        max_iters_outer::Int64=1000)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
 
     @assert size(g1) == size(g2) "g1 and g2 must have the same size"
     pixcoords = world_to_pix(wcs, worldcoords)
