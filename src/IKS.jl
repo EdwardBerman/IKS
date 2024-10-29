@@ -13,14 +13,6 @@ k1, k2 are wave numbers
 M is the Mask
 =#
 
-#=
-def get_lmax_dct_inpaint(self, gamma1, gamma2):
-    """return the maximum of the DCT absolute value of the convergence map"""
-    eb = self.gamma_to_cf_kappa(gamma1, gamma2)
-    lmax = np.max(np.abs(dct2d(eb.real, norm="ortho")), axis=(-2, -1))
-    return lmax
-=#
-
 function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
     @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
     k1 = fftfreq(size(γ1, 1))
@@ -37,6 +29,10 @@ end
 
 function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float64
     κ = γ_to_κ(γ1, γ2)
+    κ_E = real(κ)
+    ϕκ = dct(κ_E) # TO-DO: Check the normalization on this
+    λ_max = maximum(ϕκ)
+    return λ_max
 end
 
 function add_zero_padding(image::AbstractMatrix{<:Real}, padding::Int64=2)::AbstractMatrix{<:Real}
