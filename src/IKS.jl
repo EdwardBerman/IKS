@@ -21,10 +21,12 @@ function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Abs
     k2 = fftfreq(size(γ1, 2))
     temp = zeros(size(k2, 1), size(k1, 1))
     k1 = zeros(size(k2, 1), size(k1, 1)) .+ k1'
+    k1 = k1'
     for col in eachcol(temp)
         col .= col .+ k2  
     end
     k2 = temp 
+    k2 = k2'
     k_squared = k1.^2 + k2.^2
     ϵ = 1e-10
     denominator = k_squared .+ ϵ
@@ -136,7 +138,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
 
             λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
         end
-        κ_E = real(κ_i)
+        κ_E = real(κ_i) 
     end
     return κ_E
 end
