@@ -3,6 +3,7 @@ module IterativeKaisserSquires
 using LinearAlgebra
 using WCS
 using FFTW
+using SpecialFunctions
 
 #=
 αJ2000 , δJ2000 are astrometric coordinates right ascension and declination
@@ -100,6 +101,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
         x::AbstractVector{<:Real},
         y::AbstractVector{<:Real},
         resolution::Float64,
+        λmin::Float64=0.0,
         max_iters_inner::Int64=3,
         max_iters_outer::Int64=100)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
 
@@ -125,9 +127,14 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
-        end
-    end
 
+            # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
+
+            λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
+        end
+        κ_E = real(κ_i)
+    end
+    return κ_E
 end
 
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
@@ -135,6 +142,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
         worldcoords::AbstractMatrix{<:Real},
         wcs::WCSTransform, 
         resolution::Float64,
+        λmin::Float64=0.0,
         max_iters_inner::Int64=3,
         max_iters_outer::Int64=1000)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
 
