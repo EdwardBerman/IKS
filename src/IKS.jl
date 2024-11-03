@@ -124,6 +124,8 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
     κ_E = zeros(size(γ1))
     γ_init = γ1 + γ2*im
 
+    wavelet_scale = Int(round(log(minimum(size(γ1)))))
+
     for k in 1:max_iters_outer
         γ_k = γ_init .* (1 .- κ_E)
         κ_k = γ_to_κ(real(γ_k), imag(γ_k))
@@ -138,7 +140,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
 
             λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
         end
-        κ_E = real(κ_i) 
+        κ_E = real(κ_i) # Is this right?
     end
     return κ_E
 end
