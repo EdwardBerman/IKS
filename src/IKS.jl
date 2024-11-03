@@ -15,7 +15,7 @@ M is the Mask
 note also that α = ϕk in later contexts
 =#
 
-function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Complex}
     @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
     k1 = fftfreq(size(γ1, 1))
     k2 = fftfreq(size(γ1, 2))
@@ -63,7 +63,7 @@ function average_shear_binning(g1::AbstractVector{<:Real},
         g2::AbstractVector{<:Real}, 
         x::AbstractVector{<:Real},
         y::AbstractVector{<:Real},
-        resolution::Float64)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
+        resolution::Float64)::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
 
     @assert size(g1) == size(g2) "g1 and g2 must have the same size"
     @assert size(x) == size(y) "x and y must have the same size"
@@ -101,6 +101,9 @@ function average_shear_binning(g1::AbstractVector{<:Real},
     return shear_field_g1, shear_field_g2, M
 
 end
+
+function b3spline_smoothing(image::AbstractMatrix{<:Complex}, Step::Int64=1)::AbstractMatrix{<:Complex}
+    # Reference: https://github.com/CosmoStat/cosmostat/blob/master/pycs/sparsity/sparse2d/starlet.py
 
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
         g2::AbstractVector{<:Real}, 
