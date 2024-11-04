@@ -169,7 +169,9 @@ function W(κ::AbstractMatrix{<:Real}, scales::Int64)::Tuple{AbstractMatrix{<:Re
 
         input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
         image_out = reshape(conv_layer(input_data), size(κ))
-        image_auxiliary = reshape(conv_layer(image_out), size(κ))
+                
+        image_auxiliary = reshape(conv_layer(reshape(Float32.(image_out), size(κ)..., 1, 1)), size(κ))
+
         wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
         image_in = image_out
 
