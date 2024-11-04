@@ -163,13 +163,20 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<
         kernel = b3spline_smoothing(step=2^i)
         kernel_size = size(kernel)
         padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
+
         conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
-    
         conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
 
-        input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
-        image_out = reshape(conv_layer(input_data), size(κ))
-        image_auxiliary = reshape(conv_layer(image_out), size(κ))
+        real_input = reshape(Float32.(real(image_in)), size(image_in)..., 1, 1)
+        imag_input = reshape(Float32.(imag(image_in)), size(image_in)..., 1, 1)
+
+        real_output = conv_layer(real_input)
+        imag_output = conv_layer(imag_input)
+
+        image_out = reshape(real_output, size(κ)) + im * reshape(imag_output, size(κ))
+
+        image_auxiliary = reshape(conv_layer(real_output) + im * conv_layer(imag_output), size(κ))
+
         wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
         image_in = image_out
 
