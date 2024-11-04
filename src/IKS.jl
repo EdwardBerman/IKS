@@ -160,11 +160,11 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<
     normalization_image_output = zeros(size(κ))
 
     for i in 1:(scales - 1)
-        kernel_size = size(b3spline_smoothing(step=2^i))  
+        kernel = b3spline_smoothing(step=2^i)
+        kernel_size = size(kernel)
         padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
         conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
     
-        kernel = b3spline_smoothing(step=2^i)
         conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
 
         input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
