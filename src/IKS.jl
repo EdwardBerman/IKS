@@ -123,12 +123,15 @@ end
 
 function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     wavelet_coefficients = zeros(scales, size(κ)...)
+    image_in = κ
+    image_out = zeros(size(κ))
     for i in 1:(length(scales) - 1)
         kernel = b3spline_smoothing(step=2^i)
-        smoothed_data = conv(κ, kernel)
-        wavelet_coefficients[i, :, :] = smoothed_data
-        κ = deconvolution(smoothed_data, kernel)
+        image_out = conv(κ, kernel)
+        wavelet_coefficients[i, :, :] = image_in - image_out
+        image_in = image_out
     end
+    wavelet_coefficients[end, :, :] = image_out
     return wavelet_coefficients
 end
 
