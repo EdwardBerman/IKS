@@ -125,7 +125,7 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     wavelet_coefficients = zeros(scales, size(κ)...)
     image_in = κ
     image_out = zeros(size(κ))
-    for i in 1:(length(scales) - 1)
+    for i in 1:(scales - 1)
         kernel = b3spline_smoothing(step=2^i)
         image_out = conv(κ, kernel)
         wavelet_coefficients[i, :, :] = image_in - image_out
@@ -133,6 +133,24 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     end
     wavelet_coefficients[end, :, :] = image_out
     return wavelet_coefficients
+end
+
+function WT(wavelet_coefficients::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+
+end
+
+function normalize_wavelets(wavelet_coefficients::AbstractMatrix{<:Real}, M::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+    normalized_wavelets = zeros(size(wavelet_coefficients))
+    for i in 1:size(wavelet_coefficients, 1)
+        in_mask = M .> 0
+        in_mask_w = wavelet_coefficients[i, :, :] .* in_mask
+        out_mask = M .<= 0
+        out_mask_w = wavelet_coefficients[i, :, :] .* out_mask
+        σ_in = std(in_mask_w)
+        σ_out = std(out_mask_w)
+        normalized_wavelets[i, :, :] = wavelet_coefficients[i, :, :] .* (σ_out / σ_in)
+    end
+    return normalized_wavelets
 end
 
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
@@ -171,18 +189,14 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
 
-            kernel = b3spline_fast(step)
-            smoothed_data = conv(κ_i, kernel)
+            wavelet_coefficients = normalize_wavelets(W(κ_i, wavelet_scales), M) # add further normalization steps per the template code
 
-            # σ filtering 
-
-            data = deconvolution(smoothed_data, kernel)
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
 
             λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
         end
-        κ_E = real(κ_i) # Is this right?
+        κ_E = real(κ_i) 
     end
     return κ_E
 end
