@@ -35,8 +35,9 @@ function P_star_γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real
     k_squared = k1.^2 + k2.^2
     ϵ = 1e-10
     denominator = k_squared .+ ϵ
-    numerator = (k1 .- k2*im) .^2
-    κ = ifft((numerator ./ denominator) .* fft(γ1 .+ γ2*im))
+    numerator = (k1 .- k2 .* im) .^2
+    γ = Complex{Float64}.(γ1 .+ γ2 .* im)
+    κ = ifft((numerator ./ denominator) .* fft(γ))
     return κ
 end
 
@@ -56,7 +57,8 @@ function P_star_κ_to_γ(κ_E::AbstractMatrix{<:Real}, κ_B::AbstractMatrix{<:Re
     ϵ = 1e-10
     denominator = k_squared .+ ϵ
     numerator = (k1 .+ k2*im) .^2
-    γ = ifft((numerator ./ denominator) .* fft(κ_E .+ κ_B*im))
+    κ = Complex{Float64}.(κ_E .+ κ_B .* im)
+    γ = ifft((numerator ./ denominator) .* fft(κ))
     γ_1, γ_2 = real(γ), imag(γ)
     return γ_1, γ_2
 end
@@ -70,16 +72,18 @@ function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float
 end
 
 function add_zero_padding(image::AbstractMatrix{<:Real}, padding::Int64=2)::AbstractMatrix{<:Real}
-    @assert padding >= 0 "padding must be a non-negative integer"
-    padded_image = zeros(Int(size(image, 1)*padding), Int(size(image, 2)*padding))
+    @assert padding >= 1 "padding must be a positive integer"
+    original_rows, original_cols = size(image)
+    padded_rows = original_rows * padding
+    padded_cols = original_cols * padding
+   
+    padded_image = zeros(Real, padded_rows, padded_cols)
     
     start_row = floor(Int, (padded_rows - original_rows) / 2) + 1
     start_col = floor(Int, (padded_cols - original_cols) / 2) + 1
+    
     end_row = start_row + original_rows - 1
     end_col = start_col + original_cols - 1
-    
-    @assert start_row > 0 && start_col > 0 "Padding too small to center the image."
-    @assert end_row <= padded_rows && end_col <= padded_cols "Padding too small to center the image."
     
     padded_image[start_row:end_row, start_col:end_col] .= image
     return padded_image
