@@ -260,7 +260,8 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
 
         for i in 1:max_iters_inner
             α = dct(κ_i)  # α = ϕ^T k^i
-            α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
+            λ_mask = [abs(α[i,j]) > λ_i ? 1 : 0 for i in 1:size(α, 1), j in 1:size(α, 2)]
+            α_tilde = α .* λ_mask
             κ_i = idct(α_tilde)
             wavelet_coefficients, norms = W(κ_i, wavelet_scales)
             wavelet_coefficients = Q(wavelet_coefficients, M)
