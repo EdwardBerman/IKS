@@ -127,7 +127,7 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     image_out = zeros(size(κ))
     image_auxiliary = zeros(size(κ))
     
-    kernel_size = size(b3spline_smoothing(step=1))  # Assuming this returns a kernel matrix
+    kernel_size = size(b3spline_smoothing(step=1))  #
     padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
     conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
     
@@ -154,11 +154,11 @@ function normalize_wavelets(wavelet_coefficients::AbstractMatrix{<:Real}, M::Abs
     normalized_wavelets = zeros(size(wavelet_coefficients))
     for i in 1:size(wavelet_coefficients, 1)
         in_mask = M .> 0
-        in_mask_w = wavelet_coefficients[i, :, :] .* in_mask
+        σ_in = std(wavelet_coefficients[i, :, :][Bool.(in_mask)])
+
         out_mask = M .<= 0
-        out_mask_w = wavelet_coefficients[i, :, :] .* out_mask
-        σ_in = std(in_mask_w)
-        σ_out = std(out_mask_w)
+        σ_out = std(wavelet_coefficients[i, :, :][Bool.(out_mask)])
+
         normalized_wavelets[i, :, :] = wavelet_coefficients[i, :, :] .* (σ_out / σ_in)
     end
     return normalized_wavelets
