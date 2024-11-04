@@ -3,7 +3,7 @@ module IterativeKaisserSquires
 using LinearAlgebra
 using WCS
 using FFTW
-using DSP
+using Flux
 # using DeconvOptim
 using SpecialFunctions
 
@@ -125,13 +125,24 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     wavelet_coefficients = zeros(scales, size(κ)...)
     image_in = κ
     image_out = zeros(size(κ))
+    image_auxiliary = zeros(size(κ))
+    
+    kernel_size = size(b3spline_smoothing(step=1))  # Assuming this returns a kernel matrix
+    padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
+    conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
+    
     for i in 1:(scales - 1)
         kernel = b3spline_smoothing(step=2^i)
-        image_out = conv(κ, kernel)
-        wavelet_coefficients[i, :, :] = image_in - image_out
-        image_in = image_out
+        conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
+        input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
+        image_out = reshape(conv_layer(input_data), size(κ))
+        image_auxiliary = reshape(conv_layer(image_out), size(κ))
+        wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
+        image_in = image_auxiliary
     end
-    wavelet_coefficients[end, :, :] = image_out
+    
+    wavelet_coefficients[end, :, :] .= image_out
+    
     return wavelet_coefficients
 end
 
@@ -188,7 +199,6 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
-
             wavelet_coefficients = normalize_wavelets(W(κ_i, wavelet_scales), M) # add further normalization steps per the template code
 
 
