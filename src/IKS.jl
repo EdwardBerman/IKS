@@ -3,6 +3,8 @@ module IterativeKaisserSquires
 using LinearAlgebra
 using WCS
 using FFTW
+using DSP
+using DeconvOptim
 using SpecialFunctions
 
 #=
@@ -102,8 +104,21 @@ function average_shear_binning(g1::AbstractVector{<:Real},
 
 end
 
-function b3spline_smoothing(image::AbstractMatrix{<:Complex}, Step::Int64=1)::AbstractMatrix{<:Complex}
-    # Reference: https://github.com/CosmoStat/cosmostat/blob/master/pycs/sparsity/sparse2d/starlet.py
+function b3spline_smoothing(step::Int64=1)::AbstractMatrix{<:Complex}
+    step_hole = Int(step)
+    c1 = 1.0 / 16.0
+    c2 = 1.0 / 4.0
+    c3 = 3.0 / 8.0
+    length = Int(4 * step_hole + 1)
+    kernel1d = zeros(Float64, 1, length)
+    kernel1d[1, 1] = c1
+    kernel1d[1, end] = c1
+    kernel1d[1, step_hole + 1] = c2
+    kernel1d[1, end - step_hole] = c2
+    kernel1d[1, 2 * step_hole + 1] = c3
+    kernel2d = kernel1d' * kernel1d
+    return kernel2d
+end
 
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
         g2::AbstractVector{<:Real}, 
@@ -127,19 +142,22 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
     κ_E = zeros(size(γ1))
     γ_init = γ1 + γ2*im
 
-    wavelet_scale = Int(round(log(minimum(size(γ1)))))
-
-    wavelet_coefficients = zeros(wavelet_scale, size(γ1)...)
+    wavelet_scales = Int(round(log(minimum(size(κ_E)))))
+    wavelet_coefficients = zeros(wavelet_scales, size(κ_E)...)
 
     for k in 1:max_iters_outer
         γ_k = γ_init .* (1 .- κ_E)
         κ_k = γ_to_κ(real(γ_k), imag(γ_k))
         κ_i = κ_k
-        λ_i = λ_max
+        λ_i = λmax
+
         for i in 1:max_iters_inner
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
+
+            kernel = b3spline_fast(step)
+            smoothed_data = conv(κ_i, kernel)
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
 
