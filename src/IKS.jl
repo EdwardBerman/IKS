@@ -126,24 +126,43 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     image_in = κ
     image_out = zeros(size(κ))
     image_auxiliary = zeros(size(κ))
-    
-    kernel_size = size(b3spline_smoothing(step=1))  #
+
+    normalization_image_input = zeros(size(κ))
+    normalization_image_input[size(κ, 1) ÷ 2, size(κ, 2) ÷ 2] = 1.0
+    normalization_coefficients = zeros(scales, size(κ)...)
+    normalization_image_output = zeros(size(κ))
+
+    kernel_size = size(b3spline_smoothing(step=1))  
     padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
     conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
+    conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
     
     for i in 1:(scales - 1)
         kernel = b3spline_smoothing(step=2^i)
-        conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
+
         input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
         image_out = reshape(conv_layer(input_data), size(κ))
         image_auxiliary = reshape(conv_layer(image_out), size(κ))
         wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
         image_in = image_auxiliary
+
+        normalization_image_output = conv_layer(reshape(Float32.(normalization_image_input), size(κ)..., 1, 1))
+        normalization_image_input = reshape(conv_layer(normalization_image_output), size(κ))
+        squared_norm = normalization_image_output .^ 2
+        normalization_coefficients[i, :, :] .= squared_norm
     end
     
     wavelet_coefficients[end, :, :] .= image_out
+    normalization_coefficients[end, :, :] .= normalization_image_output .^ 2
+    tabNs = zeros(scales, 1)
+
+    for i in 1:scales
+        tabNs[i] = sqrt(sum(sum(normalization_coefficients[i, :, :], dims=1), dims=2)[1])
+    end
     
-    return wavelet_coefficients
+    normalized_wavelength_coefficients = wavelet_coefficients ./ tabNs
+    
+    return normalized_wavelength_coefficients
 end
 
 function WT(wavelet_coefficients::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
@@ -199,7 +218,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
-            wavelet_coefficients = normalize_wavelets(W(κ_i, wavelet_scales), M) # add further normalization steps per the template code
+            wavelet_coefficients = normalize_wavelets(W(κ_i, wavelet_scales), M) 
 
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
