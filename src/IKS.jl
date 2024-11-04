@@ -132,7 +132,7 @@ function average_shear_binning(g1::AbstractVector{<:Real},
 
 end
 
-function b3spline_smoothing(; step::Int64=1)::AbstractMatrix{<:Complex}
+function b3spline_smoothing(; step::Int64=1)::AbstractMatrix{<:Real}
     step_hole = Int(step)
     c1 = 1.0 / 16.0
     c2 = 1.0 / 4.0
