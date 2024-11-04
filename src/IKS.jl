@@ -4,7 +4,7 @@ using LinearAlgebra
 using WCS
 using FFTW
 using DSP
-using DeconvOptim
+# using DeconvOptim
 using SpecialFunctions
 
 #=
@@ -14,6 +14,7 @@ g1, g2 are shear
 k1, k2 are wave numbers
 κ_E and κ_B are the convergence fields
 M is the Mask
+W is the wavelet transform
 note also that α = ϕk in later contexts
 =#
 
@@ -120,6 +121,17 @@ function b3spline_smoothing(step::Int64=1)::AbstractMatrix{<:Complex}
     return kernel2d
 end
 
+function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
+    wavelet_coefficients = zeros(scales, size(κ)...)
+    for i in 1:(length(scales) - 1)
+        kernel = b3spline_smoothing(step=2^i)
+        smoothed_data = conv(κ, kernel)
+        wavelet_coefficients[i, :, :] = smoothed_data
+        κ = deconvolution(smoothed_data, kernel)
+    end
+    return wavelet_coefficients
+end
+
 function IterativeKaisserSquires(g1::AbstractVector{<:Real}, 
         g2::AbstractVector{<:Real}, 
         x::AbstractVector{<:Real},
@@ -158,6 +170,10 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
 
             kernel = b3spline_fast(step)
             smoothed_data = conv(κ_i, kernel)
+
+            # σ filtering 
+
+            data = deconvolution(smoothed_data, kernel)
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
 
