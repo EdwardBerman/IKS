@@ -4,7 +4,6 @@ using LinearAlgebra
 using WCS
 using FFTW
 using Flux
-# using DeconvOptim
 using SpecialFunctions
 
 #=
@@ -15,10 +14,11 @@ k1, k2 are wave numbers
 κ_E and κ_B are the convergence fields
 M is the Mask
 W is the wavelet transform
+Q is the normalization constraint
 note also that α = ϕk in later contexts
 =#
 
-function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Complex}
+function P_star_γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::AbstractMatrix{<:Complex}
     @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
     k1 = fftfreq(size(γ1, 1))
     k2 = fftfreq(size(γ1, 2))
@@ -39,7 +39,7 @@ function γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Abs
 end
 
 function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float64
-    κ = γ_to_κ(γ1, γ2)
+    κ = P_star_γ_to_κ(γ1, γ2)
     κ_E = real(κ)
     α = dct(κ_E) # TO-DO: Check the normalization on this. Note α = ϕ^T k
     λ_max = maximum(α)
@@ -135,10 +135,10 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     kernel_size = size(b3spline_smoothing(step=1))  
     padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
     conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
-    conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
     
     for i in 1:(scales - 1)
         kernel = b3spline_smoothing(step=2^i)
+        conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
 
         input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
         image_out = reshape(conv_layer(input_data), size(κ))
@@ -157,7 +157,7 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     tabNs = zeros(scales, 1)
 
     for i in 1:scales
-        tabNs[i] = sqrt(sum(sum(normalization_coefficients[i, :, :], dims=1), dims=2)[1])
+        tabNs[i] = sqrt(sum(sum(normalization_coefficients[i, :, :], dims=1), dims=2)[1]) # rows then columns for sum
     end
     
     normalized_wavelength_coefficients = wavelet_coefficients ./ tabNs
@@ -169,7 +169,7 @@ function WT(wavelet_coefficients::AbstractMatrix{<:Real})::AbstractMatrix{<:Real
 
 end
 
-function normalize_wavelets(wavelet_coefficients::AbstractMatrix{<:Real}, M::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+function Q(wavelet_coefficients::AbstractMatrix{<:Real}, M::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
     normalized_wavelets = zeros(size(wavelet_coefficients))
     for i in 1:size(wavelet_coefficients, 1)
         in_mask = M .> 0
@@ -210,7 +210,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
 
     for k in 1:max_iters_outer
         γ_k = γ_init .* (1 .- κ_E)
-        κ_k = γ_to_κ(real(γ_k), imag(γ_k))
+        κ_k = P_star_γ_to_κ(real(γ_k), imag(γ_k))
         κ_i = κ_k
         λ_i = λmax
 
@@ -218,7 +218,7 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
-            wavelet_coefficients = normalize_wavelets(W(κ_i, wavelet_scales), M) 
+            wavelet_coefficients = Q(W(κ_i, wavelet_scales), M) 
 
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
