@@ -1,4 +1,6 @@
-module IterativeKaisserSquires
+module IKS
+
+export IterativeKaisserSquires
 
 using LinearAlgebra
 using WCS
