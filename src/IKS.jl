@@ -111,8 +111,8 @@ function average_shear_binning(g1::AbstractVector{<:Real},
     M = zeros(x_bins, y_bins)
 
     for k in eachindex(x)
-        i = x_bin_indices[k]
-        j = y_bin_indices[k]
+        i = Int(x_bin_indices[k])
+        j = Int(y_bin_indices[k])
         sum_g1[i, j] += g1[k]
         sum_g2[i, j] += g2[k]
         counts[i, j] += 1

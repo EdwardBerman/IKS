@@ -11,4 +11,4 @@ g1 = read(f[2], "g1_Rinv")
 g2 = read(f[2], "g2_Rinv")
 
 
-κ_E = IterativeKaisserSquires(g1, g2, x, y, 0.1)
+κ_E = IterativeKaisserSquires(g1, g2, x, y, 2.5)
