@@ -38,6 +38,27 @@ function P_star_γ_to_κ(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real
     return κ
 end
 
+function P_star_κ_to_γ(κ_E::AbstractMatrix{<:Real}, κ_B::AbstractMatrix{<:Real})::Tuple{AbstractMatrix{<:Real}, AbstractMatrix{<:Real}}
+    @assert size(γ1) == size(γ2) "γ1 and γ2 must have the same size"
+    k1 = fftfreq(size(γ1, 1))
+    k2 = fftfreq(size(γ1, 2))
+    temp = zeros(size(k2, 1), size(k1, 1))
+    k1 = zeros(size(k2, 1), size(k1, 1)) .+ k1'
+    k1 = k1'
+    for col in eachcol(temp)
+        col .= col .+ k2  
+    end
+    k2 = temp 
+    k2 = k2'
+    k_squared = k1.^2 + k2.^2
+    ϵ = 1e-10
+    denominator = k_squared .+ ϵ
+    numerator = (k1 .+ k2*im) .^2
+    γ = ifft((numerator ./ denominator) .* fft(κ_E .+ κ_B*im))
+    γ_1, γ_2 = real(γ), imag(γ)
+    return γ_1, γ_2
+end
+
 function λ_max(γ1::AbstractMatrix{<:Real}, γ2::AbstractMatrix{<:Real})::Float64
     κ = P_star_γ_to_κ(γ1, γ2)
     κ_E = real(κ)
@@ -121,7 +142,7 @@ function b3spline_smoothing(step::Int64=1)::AbstractMatrix{<:Complex}
     return kernel2d
 end
 
-function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<:Real}, AbstractVector{<:Real}}
+function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<:Complex}, AbstractVector{<:Complex}}
     wavelet_coefficients = zeros(scales, size(κ)...)
     image_in = κ
     image_out = zeros(size(κ))
@@ -165,7 +186,7 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<
     return normalized_wavelength_coefficients, tabNs
 end
 
-function WT(wavelet_coefficients::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+function WT(wavelet_coefficients::AbstractMatrix{<:Complex})::AbstractMatrix{<:Complex}
     scales = size(wavelet_coefficients, 1)
     step_hole = Int(2^(scales - 2))
     image_reconstructed = copy(wavelet_coefficients[scales - 1, :, :])
@@ -238,10 +259,10 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             wavelet_coefficients, norms = W(κ_i, wavelet_scales)
             wavelet_coefficients = Q(wavelet_coefficients, M)
             κ_i = WT(wavelet_coefficients .* norms)
-
-
-            # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
-
+            γ_i = P_star_κ_to_γ(real(κ_i), imag(κ_i))
+            γ_i = (ones(size(M)) .- M) .* γ_i .+ M .* γ_k
+            κ_i = P_star_γ_to_κ(real(γ_i), imag(γ_i))
+            # TO-DO: Double check when to use DCT and IDCT and how to normalize them
             λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
         end
         κ_E = real(κ_i) 
@@ -262,7 +283,45 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
     pixcoords = world_to_pix(wcs, worldcoords)
     x = pixcoords[1,:]
     y = pixcoords[2,:]
+    
+    @assert size(g1) == size(g2) "g1 and g2 must have the same size"
+    @assert size(x) == size(y) "x and y must have the same size"
 
+    # to start, we take γ ≈ g and use iterative methods to improve the estimate
+    γ1, γ2, M = average_shear_binning(g1, g2, x, y, resolution)
+    γ1, γ2, M = add_zero_padding(γ1), add_zero_padding(γ2), add_zero_padding(M)
+
+    λmin = 0.0
+    λmax = λ_max(γ1, γ2)
+
+    κ_E = zeros(size(γ1))
+    γ_init = γ1 + γ2*im
+
+    wavelet_scales = Int(round(log(minimum(size(κ_E)))))
+    wavelet_coefficients = zeros(wavelet_scales, size(κ_E)...)
+
+    for k in 1:max_iters_outer
+        γ_k = γ_init .* (1 .- κ_E)
+        κ_k = P_star_γ_to_κ(real(γ_k), imag(γ_k))
+        κ_i = κ_k
+        λ_i = λmax
+
+        for i in 1:max_iters_inner
+            α = dct(κ_i)  # α = ϕ^T k^i
+            α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
+            κ_i = idct(α_tilde)
+            wavelet_coefficients, norms = W(κ_i, wavelet_scales)
+            wavelet_coefficients = Q(wavelet_coefficients, M)
+            κ_i = WT(wavelet_coefficients .* norms)
+            γ_i = P_star_κ_to_γ(real(κ_i), imag(κ_i))
+            γ_i = (ones(size(M)) .- M) .* γ_i .+ M .* γ_k
+            κ_i = P_star_γ_to_κ(real(γ_i), imag(γ_i))
+            # TO-DO: Double check when to use DCT and IDCT and how to normalize them
+            λ_i = λmin + (λmax - λmin) * (1 - erf(2.8 * i / max_iters_inner))
+        end
+        κ_E = real(κ_i) 
+    end
+    return κ_E
 end
 
 end 
