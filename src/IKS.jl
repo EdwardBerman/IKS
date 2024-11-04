@@ -148,7 +148,7 @@ function b3spline_smoothing(; step::Int64=1)::AbstractMatrix{<:Real}
     return kernel2d
 end
 
-function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<:Complex}, AbstractVector{<:Complex}}
+function W(κ::AbstractMatrix{<:Real}, scales::Int64)::Tuple{AbstractMatrix{<:Real}, AbstractVector{<:Real}}
     wavelet_coefficients = zeros(scales, size(κ)...)
     image_in = κ
     image_out = zeros(size(κ))
@@ -163,20 +163,13 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::Tuple{AbstractMatrix{<
         kernel = b3spline_smoothing(step=2^i)
         kernel_size = size(kernel)
         padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
-
         conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
+    
         conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
 
-        real_input = reshape(Float32.(real(image_in)), size(image_in)..., 1, 1)
-        imag_input = reshape(Float32.(imag(image_in)), size(image_in)..., 1, 1)
-
-        real_output = conv_layer(real_input)
-        imag_output = conv_layer(imag_input)
-
-        image_out = reshape(real_output, size(κ)) + im * reshape(imag_output, size(κ))
-
-        image_auxiliary = reshape(conv_layer(real_output) + im * conv_layer(imag_output), size(κ))
-
+        input_data = reshape(Float32.(image_in), size(image_in)..., 1, 1)
+        image_out = reshape(conv_layer(input_data), size(κ))
+        image_auxiliary = reshape(conv_layer(image_out), size(κ))
         wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
         image_in = image_out
 
@@ -270,9 +263,11 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             λ_mask = [abs(α[i,j]) > λ_i ? 1 : 0 for i in 1:size(α, 1), j in 1:size(α, 2)]
             α_tilde = Complex{Float64}.(α .* λ_mask)
             κ_i = idct(α_tilde)
-            wavelet_coefficients, norms = W(κ_i, wavelet_scales)
-            wavelet_coefficients = Q(wavelet_coefficients, M)
-            κ_i = WT(wavelet_coefficients .* norms)
+            wavelet_coefficients_E, norms_E = W(real(κ_i), wavelet_scales)
+            wavelet_coefficients_B, norms_B = W(imag(κ_i), wavelet_scales)
+            wavelet_coefficients_E = Q(wavelet_coefficients_E, M)
+            wavelet_coefficients_B = Q(wavelet_coefficients_B, M)
+            κ_i = WT(wavelet_coefficients_E .* norms) + WT(wavelet_coefficients_B .* norms) .* im
             γ_i = P_star_κ_to_γ(real(κ_i), imag(κ_i))
             γ_i = (ones(size(M)) .- M) .* γ_i .+ M .* γ_k
             κ_i = P_star_γ_to_κ(real(γ_i), imag(γ_i))
