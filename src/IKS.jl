@@ -144,7 +144,7 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
         image_out = reshape(conv_layer(input_data), size(κ))
         image_auxiliary = reshape(conv_layer(image_out), size(κ))
         wavelet_coefficients[i, :, :] .= (image_in .- image_auxiliary)
-        image_in = image_auxiliary
+        image_in = image_out
 
         normalization_image_output = conv_layer(reshape(Float32.(normalization_image_input), size(κ)..., 1, 1))
         normalization_image_input = reshape(conv_layer(normalization_image_output), size(κ))
@@ -162,11 +162,28 @@ function W(κ::AbstractMatrix{<:Complex}, scales::Int64)::AbstractMatrix{<:Real}
     
     normalized_wavelength_coefficients = wavelet_coefficients ./ tabNs
     
-    return normalized_wavelength_coefficients
+    return normalized_wavelength_coefficients, tabNs
 end
 
 function WT(wavelet_coefficients::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
+    scales = size(wavelet_coefficients, 1)
+    step_hole = Int(2^(scales - 2))
+    image_reconstructed = copy(wavelet_coefficients[scales - 1, :, :])
+    
+    kernel_size = size(b3spline_smoothing(step=1))  
+    padding = ((kernel_size[1] - 1) ÷ 2, (kernel_size[2] - 1) ÷ 2)
+    conv_layer = Conv(kernel_size, 1 => 1, stride=(1, 1), pad=padding)
 
+    for k in (scales - 2):-1:0
+        kernel = b3spline_smoothing(step=step_hole)
+        conv_layer.weight .= reshape(Float32.(kernel), kernel_size[1], kernel_size[2], 1, 1)
+        input_data = reshape(Float32.(image_reconstructed), size(image_reconstructed)..., 1, 1)
+        image_out = reshape(conv_layer(input_data), size(κ))
+        image_reconstructed = image_out .+ wavelet_coefficients[k, :, :]
+        step_hole ÷= 2
+    end
+
+    return image_reconstructed
 end
 
 function Q(wavelet_coefficients::AbstractMatrix{<:Real}, M::AbstractMatrix{<:Real})::AbstractMatrix{<:Real}
@@ -218,7 +235,9 @@ function IterativeKaisserSquires(g1::AbstractVector{<:Real},
             α = dct(κ_i)  # α = ϕ^T k^i
             α_tilde = [abs(α[i]) > λ_i ? α[i] : 0 for i in 1:length(α)]
             κ_i = idct(α_tilde)
-            wavelet_coefficients = Q(W(κ_i, wavelet_scales), M) 
+            wavelet_coefficients, norms = W(κ_i, wavelet_scales)
+            wavelet_coefficients = Q(wavelet_coefficients, M)
+            κ_i = WT(wavelet_coefficients .* norms)
 
 
             # TO-DO: Fill in this steps, the Starlet wave transform in particular, also double check when to use DCT and IDCT and how to normalize them
