@@ -148,7 +148,7 @@ function b3spline_smoothing(; step::Int64=1)::AbstractMatrix{<:Real}
     return kernel2d
 end
 
-function W(κ::AbstractMatrix{<:Real}, scales::Int64)::Tuple{AbstractMatrix{<:Real}, AbstractVector{<:Real}}
+function W(κ::AbstractMatrix{<:Real}, scales::Int64)::Tuple{Array{Float64, 3}, AbstractMatrix{<:Real}}
     wavelet_coefficients = zeros(scales, size(κ)...)
     image_in = κ
     image_out = zeros(size(κ))
